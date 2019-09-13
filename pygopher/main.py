@@ -1,35 +1,44 @@
 
-import xml.etree.ElementTree as ET
+from lxml import etree, builder
 from pathlib import Path
 
 
-class PgoAttr:
-    def __init__(self, name=None, value=None, comment=None):
+class PgopherObject:
+    def __init__(self, name=None, value=None, **kwargs):
         self.name = name
         self.value = value
-        self.comment = comment
-        self._attr_name = self.__class__.__name__
-
-    def __str__(self):
-        return f"""<{self._attr_name} Name="{self.name}" Value="{self.value}"/>"""
+        self.__dict__.update(**kwargs)
     
     def __add__(self, other):
-        return self.value + other.value
+        return float(self.value) + float(other.value)
     
     def __sub__(self, other):
-        return self.value - other.value
+        return float(self.value) - float(other.value)
     
     def __div__(self, other):
-        return self.value / other.value
+        return float(self.value) / float(other.value)
     
     def __mul__(self, other):
-        return self.value * other.value
-    
+        return float(self.value) * float(other.value)
+
     def __repr__(self):
         return f"{self.name}, {self.value}" 
     
+    def to_element(self):
+        element = etree.Element(self.__class__.__name__)
+        for key, value in self.__dict__.items():
+            if value is not None:
+                element.set(key, str(value))
+        return element
     
-class Parameter(PgoAttr):
+    @classmethod
+    def from_element(cls, element):
+        obj = cls(name=element.tag)
+        obj.__dict__.update(**element)
+        return obj
+        
+    
+class Parameter(PgopherObject):
     """
     Core building block of other objects; used to define parameter
     and its associated value.
@@ -43,39 +52,71 @@ class Parameter(PgoAttr):
     comment : str
         A comment line for the parameter, e.g. source/origin
     """
-    def __init__(self, name=None, value=None, comment=None):
-        super().__init__(name=name, value=value, comment=comment)
+    def __init__(self, name=None, value=None, comment=None, **kwargs):
+        super().__init__(name=name, value=value, **kwargs)
+        self.comment = comment
+        
+
+class TransitionMoments(PgopherObject):
+    def __init__(self, bra="Ground", ket="Ground", **kwargs):
+        super().__init__(**kwargs)
+        self.bra = bra
+        self.ket = ket
 
 
-class CartesianTransitionMoment(PgoAttr):
-    def __init__(self, axis="a", bra=None, ket=None, parameters=None):
+class CartesianTransitionMoment(TransitionMoments):
+    """
+    Object counterpart to the CartesianTransitionMoment element, which
+    contains information about the dipole moment and its projection
+    
+    Parameters
+    ----------
+    TransitionMoments : [type]
+        [description]
+    """
+    def __init__(self, axis="a", bra="v=0", ket="v=0", dipole=1.):
         super().__init__(name="TransitionMoment")
+        assert axis in ["a", "b", "c"]
         self.axis = axis
         self.bra = bra
         self.ket = ket
-        self.parameters = parameters
+        self.dipole = dipole
+        
+    def to_element(self):
+        element = etree.Element(self.__class__.__name__)
+        for key, value in self.__dict__.items():
+            if key != "dipole":
+                element.set(key, str(value))
+        element.append(
+            Parameter(name="Strength", value=dipole)
+        )
+        return element
+    
+    @classmethod
+    def from_element(cls, element):
+        obj = cls(name=element.tag)
+        for key, value in element.items():
+            obj.__dict__.set(
+                key.lower(), value
+            )
+        for child in element.iter():
+            if child.tag == "Parameter":
+                obj.dipole = float(child.get("Strength"))
+        return obj
         
 
-class Hamiltonian(PgoAttr):
+class Hamiltonian(PgopherObject):
     def __init__(self, name=None, value=None, comment=None, parameters=None,
-                 nuclei=None):
+                 nuclei=None, **kwargs):
         super().__init__(name=name, value=value, comment=comment)
-        self.parameters = parameters
         self.nuclei = nuclei
         self.symmetry = "A"
+        self.__dict__.update(**kwargs)
         
-    @classmethod
-    def from_dict(cls, param_dict, name="v=0", comment=None):
-        parameters = [
-            Parameter(key, value) for key, value in param_dict.items()
-        ]
-        object = cls(name=name, comment=comment, parameters=parameters)
-        return object
-    
     
 class AsymmetricTop(Hamiltonian):
-    def __init__(self, name=None, value=None, comment=None, parameters=None):
-        super().__init__(name=name, value=value, comment=comment, parameters=parameters)
+    def __init__(self, name=None, value=None, comment=None, **kwargs):
+        super().__init__(name=name, value=value, comment=comment,)
         
         
 class SymmetricTop(Hamiltonian):
