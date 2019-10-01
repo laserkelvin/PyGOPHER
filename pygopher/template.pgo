@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
-<Mixture Units="MHz" Version="PGOPHER 10.1.182 04 Dec 2018 20:59  64 bit (fpc 3.3.1 x86_64-Linux)" PlotUnits="MHz">
+<Mixture Units="MHz" Version="PGOPHER 10.1.182 04 Dec 2018 20:59  32 bit (fpc 3.3.1 i386-Darwin)" PlotUnits="MHz">
   <Parameter Name="SmallE" Value="2E-18"/>
   <Species Name="Species" Jmax="60">
     <AsymmetricMolecule Name="AsymmetricTop" nNuclei="1" JAdjustSym="False">
       <AsymmetricManifold Name="Ground" Initial="True">
-        <AsymmetricTop Name="v=0" Symmetry="A">
+        <AsymmetricTop Name="v=0">
           <Parameter Name="A" Value="270000"/>
           <Parameter Name="B" Value="36000"/>
           <Parameter Name="C" Value="30000"/>
@@ -21,7 +21,8 @@
       </TransitionMoments>
     </AsymmetricMolecule>
   </Species>
+  <Parameter Name="Temperature" Value="100"/>
   <Parameter Name="Fmin" Value="0.001"/>
   <Parameter Name="Fmax" Value="2500000"/>
-  <FormSettings Name="ConstantsWindow" ActiveObject="AsymmetricTopNucleus: Species - AsymmetricTop - Ground - v=0 - Nucleus1"/>
+  <FormSettings Name="ConstantsWindow" ActiveObject="Simulation: Simulation"/>
 </Mixture>

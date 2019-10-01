@@ -3,6 +3,26 @@ from lxml import etree, builder
 from pathlib import Path
 
 
+class PgopherSimulation:
+    """
+    
+    Hierarchy is:
+    Mixture -> Species -> Molecule -> Hamiltonian/Transition moments
+    """
+    def __init__(self, T=300., **kwargs):
+        self.__dict__.update(**kwargs)
+        self.mixture = PgopherObject(
+            **{"Units": "MHz", "PlotUnits": "MHz"}
+        )
+        self.species = PgopherObject(
+            **{"Name": "Species", "Jmax": "20"}
+        )
+        self.molecule = AsymmetricTop(
+            name="AsymmetricTop",
+        )
+        
+
+
 class PgopherObject:
     def __init__(self, name=None, value=None, **kwargs):
         self.name = name
@@ -112,11 +132,28 @@ class Hamiltonian(PgopherObject):
         self.nuclei = nuclei
         self.symmetry = "A"
         self.__dict__.update(**kwargs)
+   
+   def to_element(self):
+        element = etree.Element(self.__class__.__name__)
+        try:
+            for key, value in self.parameters.items():
+                if value is not None:
+                    element.set(key, str(value))
+            return element
+        except AttributeError:
+            raise Exception(f"{self.__class__.__name__} contains no parameters.")
         
     
 class AsymmetricTop(Hamiltonian):
-    def __init__(self, name=None, value=None, comment=None, **kwargs):
+    def __init__(self, name=None, value=None, comment=None, parameters=None, **kwargs):
         super().__init__(name=name, value=value, comment=comment,)
+        self.parameters = {
+            "A": "27000",
+            "B": "3600",
+            "C": "2560"
+        }
+        if parameters:
+            self.parameters.update(**parameters)
         
         
 class SymmetricTop(Hamiltonian):
