@@ -1,166 +1,282 @@
 
-from lxml import etree, builder
+from lxml import etree
 from pathlib import Path
+from warnings import warn
+from . import utils
+
+import numpy as np
 
 
-class PgopherSimulation:
+"""
+Plan for organization
+
+Compartmentalize the problem into three classes:
+    - Simulation
+        - Temperature, Max J, etc.
+    - Molecule
+        - Rotational parameters
+        - Transition moments
+    - PGopher
+        - ElementTree builder that puts everything together
+
+"""
+
+class PGopher:
+    def __init__(self, simulation: "Element", molecule: "Element"):
+        self.simulation = simulation
+        self.molecule = molecule
+        # Add molecule as a child of simulation
+        self.simulation[-1].append(molecule)
+        #self.simulation.addprevious(
+        #    etree.ProcessingInstruction('xml', 'version=1.0')
+        #    )
+        
+    def to_xml(self):
+        return etree.tostring(
+            self.simulation, encoding='unicode', pretty_print=True
+            )
+    
+    def save_xml(self, filepath="simulation.pgo"):
+        xml = self.to_xml()
+        with open(filepath, "w+") as write_file:
+            write_file.write('<?xml version="1.0"?>\n')
+            write_file.write(xml)
+    
+    def __str__(self):
+        return self.to_xml()
+    
+    def simulate(self, filepath="simulation.pgo"):
+        self.save_xml(filepath)
+        # First run for the line list
+        process = utils.run_pgopher(filepath)
+        linelist_df = utils.parse_linelist(process.stdout)
+        process = utils.run_pgopher(filepath, "--qtable")
+        q_df = utils.parse_partition_func(process.stdout)
+        return linelist_df, q_df
+    
+    @classmethod
+    def from_yml(cls, filepath):
+        parameters = utils.read_yaml(filepath)
+        # First generate the Simulation object
+        mixture = parameters.get("mixture", None)
+        species = parameters.get("species", None)
+        sim_obj = Simulation(mixture, species)
+        # Create the Molecule object
+        mol_type = parameters.get("mol_type", "Asymmetric")
+        mol_param = parameters.get("parameters", None)
+        settings = parameters.get("settings", None)
+        trans_mom = parameters.get("trans_mom", None)
+        mol_obj = Molecule(mol_type, settings, mol_param, trans_mom)
+        pgo_obj = cls(sim_obj.to_element(), mol_obj.to_element())
+        return pgo_obj
+    
+    @classmethod
+    def from_rng(cls, seed=None, constant_max=30000., constant_min=1000., mixture=None,
+                 species=None, settings=None, parameters=None, trans_mom=None):
+        """
+        Create a PGopher simulation based on a random set of constants.
+        This is a specific case of an Asymmetric top.
+        
+        Parameters
+        ----------
+        seed : [type], optional
+            [description], by default None
+        constant_max : [type], optional
+            [description], by default 30000.
+        constant_min : [type], optional
+            [description], by default 1000.
+        mixture : [type], optional
+            [description], by default None
+        species : [type], optional
+            [description], by default None
+        settings : [type], optional
+            [description], by default None
+        parameters : [type], optional
+            [description], by default None
+        trans_mom : [type], optional
+            [description], by default None  
+        """
+        np.random.seed(seed)
+        constants = np.sort(np.random.uniform(constant_min, constant_max, 3))
+        constants = {key: value for key, value in zip(["C", "B", "A"], constants)}
+        # Do a single component spectrum for now
+        axis = int(np.random.randint(low=0, high=3))
+        dipoles = [0.] * 3
+        dipoles[axis] = 1.
+        dipoles = {key: value for key, value in zip(["a", "b", "c"], dipoles)}
+        if trans_mom:
+            dipoles.update(**trans_mom)
+        if parameters:
+            constants.update(**parameters)
+        mol_obj = Molecule(
+            parameters=constants, 
+            settings=settings,
+            trans_mom=dipoles,
+            mol_type="Asymmetric"
+            )
+        sim_obj = Simulation(
+            mixture=mixture,
+            species=species
+        )
+        pgo_obj = cls(
+            sim_obj.to_element(),
+            mol_obj.to_element()
+        )
+        return pgo_obj
+        
+
+class Simulation:
     """
     
     Hierarchy is:
-    Mixture -> Species -> Molecule -> Hamiltonian/Transition moments
+    Mixture -> Species -> Molecule -> mol_type/Transition moments
     """
-    def __init__(self, T=300., **kwargs):
-        self.__dict__.update(**kwargs)
-        self.mixture = PgopherObject(
-            **{"Units": "MHz", "PlotUnits": "MHz"}
-        )
-        self.species = PgopherObject(
-            **{"Name": "Species", "Jmax": "20"}
-        )
-        self.molecule = AsymmetricTop(
-            name="AsymmetricTop",
-        )
-        
-
-
-class PgopherObject:
-    def __init__(self, name=None, value=None, **kwargs):
-        self.name = name
-        self.value = value
-        self.__dict__.update(**kwargs)
-    
-    def __add__(self, other):
-        return float(self.value) + float(other.value)
-    
-    def __sub__(self, other):
-        return float(self.value) - float(other.value)
-    
-    def __div__(self, other):
-        return float(self.value) / float(other.value)
-    
-    def __mul__(self, other):
-        return float(self.value) * float(other.value)
-
-    def __repr__(self):
-        return f"{self.name}, {self.value}" 
-    
+    def __init__(self, mixture=None, species=None):
+        self.mixture = {
+            "Temperature": 300.,
+            "Fmin": 0.001,
+            "Fmax": 250000.,
+            "OThreshold": 1e-4,
+            "SmallE": 2e-18
+        }
+        if mixture:
+            self.mixture.update(**mixture)
+        self.species = {
+            "Name": "Species",
+            "Jmax": 30
+        }
+        if species:
+            self.species.update(**species)
+            
     def to_element(self):
-        element = etree.Element(self.__class__.__name__)
-        for key, value in self.__dict__.items():
-            if value is not None:
-                element.set(key, str(value))
-        return element
-    
-    @classmethod
-    def from_element(cls, element):
-        obj = cls(name=element.tag)
-        obj.__dict__.update(**element)
-        return obj
-        
-    
-class Parameter(PgopherObject):
-    """
-    Core building block of other objects; used to define parameter
-    and its associated value.
-    
-    Parameters
-    ----------
-    name : str
-        Name of the parameter
-    value : float
-        Value of the parameter
-    comment : str
-        A comment line for the parameter, e.g. source/origin
-    """
-    def __init__(self, name=None, value=None, comment=None, **kwargs):
-        super().__init__(name=name, value=value, **kwargs)
-        self.comment = comment
-        
-
-class TransitionMoments(PgopherObject):
-    def __init__(self, bra="Ground", ket="Ground", **kwargs):
-        super().__init__(**kwargs)
-        self.bra = bra
-        self.ket = ket
-
-
-class CartesianTransitionMoment(TransitionMoments):
-    """
-    Object counterpart to the CartesianTransitionMoment element, which
-    contains information about the dipole moment and its projection
-    
-    Parameters
-    ----------
-    TransitionMoments : [type]
-        [description]
-    """
-    def __init__(self, axis="a", bra="v=0", ket="v=0", dipole=1.):
-        super().__init__(name="TransitionMoment")
-        assert axis in ["a", "b", "c"]
-        self.axis = axis
-        self.bra = bra
-        self.ket = ket
-        self.dipole = dipole
-        
-    def to_element(self):
-        element = etree.Element(self.__class__.__name__)
-        for key, value in self.__dict__.items():
-            if key != "dipole":
-                element.set(key, str(value))
-        element.append(
-            Parameter(name="Strength", value=dipole)
+        mixture = etree.Element(
+            "Mixture"
         )
-        return element
-    
-    @classmethod
-    def from_element(cls, element):
-        obj = cls(name=element.tag)
-        for key, value in element.items():
-            obj.__dict__.set(
-                key.lower(), value
+        settings = {
+            "Units": "MHz", 
+            "PlotUnits": "MHz",
+            "IntensityUnits": "nm2MHzperMolecule",
+            "PrintLevel": "CSV"
+            }
+        for key, value in settings.items():
+            mixture.set(key, value)
+        
+        for key, value in self.mixture.items():
+            parameter = etree.SubElement(
+                mixture,
+                "Parameter"
             )
-        for child in element.iter():
-            if child.tag == "Parameter":
-                obj.dipole = float(child.get("Strength"))
-        return obj
-        
-
-class Hamiltonian(PgopherObject):
-    def __init__(self, name=None, value=None, comment=None, parameters=None,
-                 nuclei=None, **kwargs):
-        super().__init__(name=name, value=value, comment=comment)
-        self.nuclei = nuclei
-        self.symmetry = "A"
-        self.__dict__.update(**kwargs)
-   
-   def to_element(self):
-        element = etree.Element(self.__class__.__name__)
-        try:
-            for key, value in self.parameters.items():
-                if value is not None:
-                    element.set(key, str(value))
-            return element
-        except AttributeError:
-            raise Exception(f"{self.__class__.__name__} contains no parameters.")
+            parameter.set(key, str(value))
+        species = etree.Element(
+            "Species"
+        )
+        for key, value in self.species.items():
+            species.set(key, str(value))
+        mixture.append(species)
+        return mixture
+    
+    def __str__(self):
+        return etree.dump(self.to_element())
         
     
-class AsymmetricTop(Hamiltonian):
-    def __init__(self, name=None, value=None, comment=None, parameters=None, **kwargs):
-        super().__init__(name=name, value=value, comment=comment,)
+class Molecule:
+    """
+    Class for handling all of the details of the molecule
+    """
+    def __init__(self, mol_type="Asymmetric",
+                settings=None, parameters=None, trans_mom=None):
+        # settings corresponds to the name of the molecule, and corresponds
+        # to the AsymmetricMolecule Element
+        if mol_type not in ["Asymmetric", "Linear", "Symmetric"]:
+            warn(f"mol_type name not recognized - {mol_type}")
+        self.mol_type = mol_type
+        self.settings = {
+            "name": "Molecule"
+        }
+        if settings:
+            self.settings.update(**settings)
         self.parameters = {
-            "A": "27000",
-            "B": "3600",
-            "C": "2560"
+            "A": 24023.,
+            "B": 2102.,
+            "C": 1962.
         }
         if parameters:
             self.parameters.update(**parameters)
+        self.trans_mom = {
+            "a": 1.,
+            "b": 0.,
+            "c": 0.
+        }
+        if trans_mom:
+            self.trans_mom.update(**trans_mom)
+    
+    def to_element(self):
+        """
         
+        Convert the Python object into an XML representation.
+        The resulting Element can be dumped as a string with the
+        etree.dump method.
         
-class SymmetricTop(Hamiltonian):
-    def __init__(self, name=None, value=None, comment=None, parameters=None):
-        super().__init__(name=name, value=value, comment=comment, parameters=parameters)
-        
+        Returns
+        -------
+        [type]
+            [description]
+        """
+        molecule = etree.Element(
+            f"{self.mol_type}Molecule"
+            )
+        for key, value in self.settings.items():
+            molecule.set(key, value)
+        manifold = etree.Element(
+            f"{self.mol_type}Manifold"
+        )
+        for key, value in {"Name": "Ground", "Initial": "True"}.items():
+            manifold.set(key, value)
+        if self.mol_type != "Linear":
+            mol_type = f"{self.mol_type}Top"
+        else:
+            mol_type = self.mol_type
+        # Set up the Hamiltonian parameters
+        hamiltonian = etree.Element(
+            f"{mol_type}"
+        )
+        hamiltonian.set("Name", "v=0")
+        for key, value in self.parameters.items():
+            param = etree.SubElement(
+                hamiltonian,
+                "Parameter"
+            )
+            param.set("Name", key)
+            if type(value) != str:
+                value = str(value)
+            param.set("Value", value)
+        # Build up the transition moments and the corresponding
+        # dipole moments
+        transition = etree.Element(
+            "TransitionMoments"
+        )
+        for state in ["Bra", "Ket"]:
+            transition.set(state, "Ground")
+        for axis, value in self.trans_mom.items():
+            if value > 0.:
+                moment = etree.SubElement(
+                    transition,
+                    "CartesianTransitionMoment"
+                )
+                for state in ["Bra", "Ket"]:
+                    moment.set(state, "v=0")
+                moment.set("Axis", axis)
+                dipole = etree.SubElement(
+                    moment,
+                    "Parameter"
+                )
+                dipole.set("Name", "Strength")
+                dipole.set("Value", str(value))
+        # Set up the hierarchy altogether
+        manifold.append(hamiltonian)
+        for obj in [manifold, transition]:
+            molecule.append(obj)
+        return molecule
 
-class LinearTop(Hamiltonian):
-    def __init__(self, name=None, value=None, comment=None, parameters=None):
-        super().__init__(name=name, value=value, comment=comment, parameters=parameters)
+    def __str__(self):
+        return etree.dump(self.to_element())
