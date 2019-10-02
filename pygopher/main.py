@@ -2,6 +2,8 @@
 from lxml import etree
 from pathlib import Path
 from warnings import warn
+import tempfile
+import os
 from . import utils
 
 import numpy as np
@@ -45,13 +47,23 @@ class PGopher:
     def __str__(self):
         return self.to_xml()
     
-    def simulate(self, filepath="simulation.pgo"):
-        self.save_xml(filepath)
+    def simulate(self, filepath=None):
+        temp = False
+        if filepath is None:
+            temp = True
+            tempfile.tempdir = os.getcwd()
+            with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".pgo") as output:
+                xml = self.to_xml()
+                output.write('<?xml version="1.0"?>\n')
+                output.write(xml)
+                filepath = output.name
         # First run for the line list
         process = utils.run_pgopher(filepath)
         linelist_df = utils.parse_linelist(process.stdout)
         process = utils.run_pgopher(filepath, "--qtable")
         q_df = utils.parse_partition_func(process.stdout)
+        if temp is True:
+            os.remove(filepath)
         return linelist_df, q_df
     
     @classmethod
@@ -122,6 +134,7 @@ class PGopher:
             sim_obj.to_element(),
             mol_obj.to_element()
         )
+        pgo_obj.dipoles = dipoles
         return pgo_obj
         
 
