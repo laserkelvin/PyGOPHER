@@ -29,9 +29,6 @@ class PGopher:
         self.molecule = molecule
         # Add molecule as a child of simulation
         self.simulation[-1].append(molecule)
-        #self.simulation.addprevious(
-        #    etree.ProcessingInstruction('xml', 'version=1.0')
-        #    )
         
     def to_xml(self):
         return etree.tostring(
@@ -83,8 +80,8 @@ class PGopher:
         return pgo_obj
     
     @classmethod
-    def from_rng(cls, seed=None, constant_max=30000., constant_min=1000., mixture=None,
-                 species=None, settings=None, parameters=None, trans_mom=None):
+    def from_rng(cls, seed=None, constant_max=30000., constant_min=1000., distortion=False,
+                mixture=None, species=None, settings=None, parameters=None, trans_mom=None):
         """
         Create a PGopher simulation based on a random set of constants.
         This is a specific case of an Asymmetric top.
@@ -116,6 +113,16 @@ class PGopher:
         dipoles = [0.] * 3
         dipoles[axis] = 1.
         dipoles = {key: value for key, value in zip(["a", "b", "c"], dipoles)}
+        if distortion:
+            cd_terms = np.random.uniform(
+                low=0.,
+                high=[1e-2, 1e-2, 2., 1e-2, 1e-2],
+                size=5
+            )
+            cd_terms = {
+                key: value for key, value in zip(["DJ", "DJK", "DK", "deltaJ", "deltaK"], cd_terms)
+            }
+            constants.update(**cd_terms)
         if trans_mom:
             dipoles.update(**trans_mom)
         if parameters:
@@ -162,6 +169,16 @@ class Simulation:
             self.species.update(**species)
             
     def to_element(self):
+        """
+        Convert the Simulation object into an XML Element object.
+        This is the main avenue to convert the Python into the PGopher
+        readable format.
+        
+        Returns
+        -------
+        Element object
+            
+        """
         mixture = etree.Element(
             "Mixture"
         )
