@@ -222,7 +222,7 @@ class Molecule:
             warn(f"mol_type name not recognized - {mol_type}")
         self.mol_type = mol_type
         self.settings = {
-            "name": "Molecule"
+            "Name": "Molecule"
         }
         if settings:
             self.settings.update(**settings)
@@ -272,6 +272,8 @@ class Molecule:
             f"{mol_type}"
         )
         hamiltonian.set("Name", "v=0")
+        if mol_type == "Asymmetric":
+            hamiltonian.set("Symmetry", "A")
         for key, value in self.parameters.items():
             param = etree.SubElement(
                 hamiltonian,
