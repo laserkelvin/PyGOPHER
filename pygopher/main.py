@@ -189,15 +189,15 @@ class Simulation:
             "PrintLevel": "CSV"
             }
         for key, value in settings.items():
-            mixture.set("Name", key)
-            mixture.set("Value", value)
+            mixture.set(key, value)
         
         for key, value in self.mixture.items():
             parameter = etree.SubElement(
                 mixture,
                 "Parameter"
             )
-            parameter.set(key, str(value))
+            parameter.set("Name", key)
+            parameter.set("Value", value)
         species = etree.Element(
             "Species"
         )
