@@ -142,6 +142,7 @@ class PGopher:
             mol_obj.to_element()
         )
         pgo_obj.dipoles = dipoles
+        pgo_obj.constants = constants
         return pgo_obj
         
 
