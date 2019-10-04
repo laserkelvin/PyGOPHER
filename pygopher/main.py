@@ -197,7 +197,7 @@ class Simulation:
                 "Parameter"
             )
             parameter.set("Name", key)
-            parameter.set("Value", value)
+            parameter.set("Value", str(value))
         species = etree.Element(
             "Species"
         )
