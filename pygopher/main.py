@@ -272,7 +272,7 @@ class Molecule:
             f"{mol_type}"
         )
         hamiltonian.set("Name", "v=0")
-        if mol_type == "Asymmetric":
+        if self.mol_type == "Asymmetric":
             hamiltonian.set("Symmetry", "A")
         for key, value in self.parameters.items():
             param = etree.SubElement(
