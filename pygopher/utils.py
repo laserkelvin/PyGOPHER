@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from pathlib import Path
 from shutil import which
 from subprocess import run
 from typing import Any
@@ -25,7 +28,7 @@ def is_pgopher_in_path() -> bool:
     return is_present
 
 
-def run_pgopher(filepath: str, *args):
+def run_pgopher(filepath: str | Path, *args):
     """
     Wrapper to run PGopher from Python.
 
@@ -43,6 +46,9 @@ def run_pgopher(filepath: str, *args):
 
     """
     assert is_pgopher_in_path()
+    if isinstance(filepath, str):
+        filepath = Path(filepath)
+    assert filepath.exists(), f"{filepath} not found."
     keywords = ["pgo"]
     if args:
         keywords.extend(args)
