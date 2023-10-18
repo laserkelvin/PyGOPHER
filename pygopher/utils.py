@@ -4,6 +4,25 @@ import pandas as pd
 import yaml
 
 
+def is_pgopher_in_path() -> bool:
+    """
+    Simple function that checks if PGopher is present in PATH.
+
+    Returns
+    -------
+    bool
+        True if found, False if not
+    """
+    is_present = which("pgo") is not None
+    if not is_present:
+        raise FileNotFoundError(
+            "pgo binary not found in PATH;"
+            " please download the PGopher linux distribution"
+            " and ensure the `pgo` executable is in PATH."
+        )
+    return is_present
+
+
 def run_pgopher(filepath: str, *args):
     """
     Wrapper to run PGopher from Python.
