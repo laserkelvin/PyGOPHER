@@ -1,5 +1,7 @@
-
+from shutil import which
 from subprocess import run
+from typing import Any
+
 import pandas as pd
 import yaml
 
@@ -26,41 +28,39 @@ def is_pgopher_in_path() -> bool:
 def run_pgopher(filepath: str, *args):
     """
     Wrapper to run PGopher from Python.
-    
+
     Optional arguments can be supplied, which will be appended
     to the list of flags to run PGopher with.
-    
+
     Parameters
     ----------
     filepath : str
         Path to the PGopher file to be run
-    
+
     Returns
     -------
     CompletedProcess object
-        
+
     """
+    assert is_pgopher_in_path()
     keywords = ["pgo"]
     if args:
         keywords.extend(args)
     keywords.append(filepath)
-    process = run(
-        keywords,
-        capture_output=True
-    )
+    process = run(keywords, capture_output=True)
     return process
 
 
-def parse_linelist(text_stream, delimiter=","):
+def parse_linelist(text_stream, delimiter=",") -> pd.DataFrame:
     """
     Takes the standard output of the PGopher run that calculates
     a linelist.
-    
+
     Parameters
     ----------
     text_stream : str
-        [description]
-    
+        Text stream containing line list information
+
     Returns
     -------
     DataFrame
@@ -72,12 +72,12 @@ def parse_linelist(text_stream, delimiter=","):
     for index, line in enumerate(lines):
         if "Line list" in line:
             break
-    lines = lines[index + 1:]
+    lines = lines[index + 1 :]
     # First line is not needed, and second line contains the header
-    #_ = lines.pop(0)
+    # _ = lines.pop(0)
     labels = lines.pop(0).split(delimiter)
-    labels = [name.replace('\\', "") for name in labels]
-    labels = [name.replace('"', "") for name in labels]
+    for symbol in ["\\", '"']:
+        labels = [name.replace(symbol, "") for name in labels]
     data = list()
     for line in lines:
         line = line.split(",")
@@ -88,7 +88,7 @@ def parse_linelist(text_stream, delimiter=","):
     return df
 
 
-def parse_partition_func(text_stream):
+def parse_partition_func(text_stream) -> pd.DataFrame:
     text_stream = str(text_stream)
     lines = text_stream.split("\\n")
     data = list()
@@ -104,12 +104,12 @@ def parse_partition_func(text_stream):
             read = True
     df = pd.DataFrame(data, columns=labels)
     return df
-    
 
-def read_yaml(filepath):
+
+def read_yaml(filepath) -> dict[str, Any]:
     with open(filepath, "r") as stream:
         try:
             data = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
-            print(exc)
+            raise yaml.YAMLError(f"Cannot read {filepath} as YAML.") from exc
     return data
