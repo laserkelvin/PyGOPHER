@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<Mixture Units="MHz" Version="PGOPHER 10.1.182 04 Dec 2018 20:59  32 bit (fpc 3.3.1 i386-Darwin)" PlotUnits="MHz">
+<Mixture Units="MHz" PrintLevel="plCSV" Version="PGOPHER 10.1.182 04 Dec 2018 20:59  32 bit (fpc 3.3.1 i386-Darwin)" PlotUnits="MHz" IntensityUnits="nm2MHzperMolecule">
   <Parameter Name="SmallE" Value="2E-18"/>
   <Species Name="Species" Jmax="60">
     <AsymmetricMolecule Name="AsymmetricTop" nNuclei="1" JAdjustSym="False">
@@ -8,6 +8,11 @@
           <Parameter Name="A" Value="270000"/>
           <Parameter Name="B" Value="36000"/>
           <Parameter Name="C" Value="30000"/>
+          <Parameter Name="DK" Value="2"/>
+          <Parameter Name="DJK" Value="0.001"/>
+          <Parameter Name="DJ" Value="0.05"/>
+          <Parameter Name="deltaK" Value="0.006"/>
+          <Parameter Name="deltaJ" Value="0.3"/>
           <AsymmetricTopNucleus Name="Nucleus1">
             <Parameter Name="CHIzz" Value="32"/>
           </AsymmetricTopNucleus>
@@ -22,7 +27,7 @@
     </AsymmetricMolecule>
   </Species>
   <Parameter Name="Temperature" Value="100"/>
-  <Parameter Name="Fmin" Value="0.001"/>
-  <Parameter Name="Fmax" Value="2500000"/>
-  <FormSettings Name="ConstantsWindow" ActiveObject="Simulation: Simulation"/>
+  <Parameter Name="Fmin" Value="13264.9830293838"/>
+  <Parameter Name="Fmax" Value="15326.0758546665"/>
+  <FormSettings Name="ConstantsWindow" ActiveObject="AsymmetricTop: Species - AsymmetricTop - Ground - v=0"/>
 </Mixture>

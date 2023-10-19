@@ -1,15 +1,45 @@
-[tool.poetry]
-name = "PyGOPHER"
-version = "0.1.0"
-description = ""
-authors = ["Kelvin Lee <kin.long.kelvin.lee@gmail.com>"]
-
-[tool.poetry.dependencies]
-python = "^3.7"
-
-[tool.poetry.dev-dependencies]
-pytest = "^3.0"
-
 [build-system]
-requires = ["poetry>=0.12"]
-build-backend = "poetry.masonry.api"
+build-backend = "setuptools.build_meta"
+requires = ["setuptools >= 61.0"]
+
+[project]
+authors = [
+  {"name" = "Kin Long Kelvin Lee", "email" = "kin.long.kelvin.lee@gmail.com"},
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+]
+dependencies = [
+    "lxml",
+    "pandas",
+    "numpy"
+]
+description = "Python interface/wrapper for rotational spectral simulations with PGopher"
+dynamic = ["version", "readme"]
+keywords = ["spectroscopy", "physical-chemistry", "rotational-spectroscopy"]
+license = {file = "LICENSE.md"}
+name = "pygopher"
+requires-python = ">=3.8"
+
+[project.optional-dependencies]
+dev = [
+  "black>=23.9.0",
+  "flake8",
+  "flake8-pyproject",
+  "flake8-black",
+  "flake8-bandit",
+  "pre-commit",
+  "bandit",
+  "pytest"
+]
+
+[tool.setuptools.packages.find]
+include = ["pygopher*"]
+where = ["."]
+
+[tool.setuptools.dynamic]
+readme = {file = ["README.md"]}
+version = {attr = "pygopher.__version__"}
